@@ -4,8 +4,6 @@ import 'dragula/dist/dragula.css';
 import Swimlane from './Swimlane';
 import './Board.css';
 
-const STATUSES = ['backlog', 'in-progress', 'complete'];
-
 export default class Board extends React.Component {
   constructor(props) {
     super(props);
@@ -45,8 +43,10 @@ export default class Board extends React.Component {
       const sourceStatus = this.statusForContainer(source);
       if (!id || !targetStatus || !sourceStatus) return;
 
-      // Dragula updates the DOM; mirror the move into React state so renders
-      // preserve both lane membership and card order.
+      // Capture the post-drop DOM order before React reconciles the board.
+      const targetDomOrder = Array.from(target.children).map(card => card.getAttribute('data-id'));
+      const targetIndex = targetDomOrder.indexOf(String(id));
+
       this.setState(previousState => {
         const nextClients = {
           backlog: previousState.clients.backlog.slice(),
@@ -57,27 +57,16 @@ export default class Board extends React.Component {
         const sourceKey = keys[sourceStatus];
         const targetKey = keys[targetStatus];
         const sourceIndex = nextClients[sourceKey].findIndex(client => String(client.id) === String(id));
-        if (sourceIndex === -1) return null;
+        if (sourceIndex === -1 || targetIndex === -1) return null;
 
         const movedClient = { ...nextClients[sourceKey][sourceIndex], status: targetStatus };
         nextClients[sourceKey].splice(sourceIndex, 1);
-
-        // Use the actual dropped DOM position to retain Dragula's ordering.
-        const targetIds = Array.from(target.children)
-          .map(card => card.getAttribute('data-id'))
-          .filter(cardId => cardId && cardId !== String(id));
-        const targetOrder = targetIds.indexOf(String(id));
-        const insertAt = Math.max(0, Math.min(targetOrder === -1
-          ? target.children.length - 1
-          : targetOrder, nextClients[targetKey].length));
+        const insertAt = Math.max(0, Math.min(targetIndex, nextClients[targetKey].length));
         nextClients[targetKey].splice(insertAt, 0, movedClient);
 
-        // Reconcile target lane order with the DOM after Dragula completes.
-        const domOrder = Array.from(target.children).map(card => card.getAttribute('data-id'));
-        nextClients[targetKey].sort((a, b) => domOrder.indexOf(String(a.id)) - domOrder.indexOf(String(b.id)));
         return { clients: nextClients };
       });
-    });
+    });;
 
     this.dragula.on('cancel', () => {
       // No state update is necessary when Dragula cancels a drag.
