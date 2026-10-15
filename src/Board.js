@@ -31,7 +31,7 @@ export default class Board extends React.Component {
     ].filter(Boolean);
 
     this.dragula = Dragula(containers, {
-      moves: (el, source, handle) => !handle.closest('.Swimlane-title'),
+      moves: (el, source, handle) => !!handle && !handle.closest('.Swimlane-title'),
       accepts: (el, target) => containers.indexOf(target) !== -1,
       revertOnSpill: true,
     });
@@ -66,7 +66,7 @@ export default class Board extends React.Component {
 
         return { clients: nextClients };
       });
-    });;
+    });
 
     this.dragula.on('cancel', () => {
       // No state update is necessary when Dragula cancels a drag.
