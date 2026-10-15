@@ -21,6 +21,7 @@ export default class Board extends React.Component {
       complete: React.createRef(),
     };
     this.dragula = null;
+    this.dragOrigin = null;
   }
 
   componentDidMount() {
@@ -36,16 +37,36 @@ export default class Board extends React.Component {
       revertOnSpill: true,
     });
 
+    // Remember where the card belonged before Dragula moves it in the DOM.
+    this.dragula.on('drag', (el, source) => {
+      this.dragOrigin = {
+        source,
+        nextSibling: el.nextSibling,
+      };
+    });
+
     this.dragula.on('drop', (el, target, source) => {
       if (!el || !target || !source) return;
       const id = el.getAttribute('data-id');
       const targetStatus = this.statusForContainer(target);
       const sourceStatus = this.statusForContainer(source);
-      if (!id || !targetStatus || !sourceStatus) return;
+      if (!id || !targetStatus || !sourceStatus) {
+        this.dragOrigin = null;
+        return;
+      }
 
-      // Capture the post-drop DOM order before React reconciles the board.
+      // Read the desired order, then restore the DOM node before React updates.
+      // React must be the only system that commits the card's final location.
       const targetDomOrder = Array.from(target.children).map(card => card.getAttribute('data-id'));
       const targetIndex = targetDomOrder.indexOf(String(id));
+      const origin = this.dragOrigin;
+      if (origin && origin.source === source) {
+        const anchor = origin.nextSibling && origin.nextSibling.parentNode === source
+          ? origin.nextSibling
+          : null;
+        source.insertBefore(el, anchor);
+      }
+      this.dragOrigin = null;
 
       this.setState(previousState => {
         const nextClients = {
